@@ -27,7 +27,9 @@ g <- g + geom_point()
 g <- g + geom_smooth(method = "lm", formula = y ~ x)
 g
 ```
+This visualization is ok but I think I will try logging both variables.
 
+I found a different method, lets give this a try:
 ```{r}
 library(ggpmisc)
 m <- lm(data = d, HomeRange_km2 ~ Body_mass_female_mean)
@@ -45,6 +47,7 @@ Body_mass_female_mean 2.454e-04  4.736e-05
 (Intercept)             1.084     0.28    
 Body_mass_female_mean   5.183 7.78e-07 ***
 
+Now with log:
 ```{r}
 mlog <- lm(data = d, log(HomeRange_km2) ~ log(Body_mass_female_mean))
 summary(mlog)
@@ -67,6 +70,7 @@ log(Body_mass_female_mean)   12.21   <2e-16 ***
 
 ##Estimate the standard error for each of your β coefficients as the standard deviation of the sampling distribution from your bootstrap and determine the 95% CI for each of your β coefficients based on the appropriate quantiles from your sampling distribution.
 
+Not logged:
 ```{r}
 # Bootstrap 95% CI for R-Squared
 library(boot)
@@ -88,6 +92,7 @@ plot(results)
 boot.ci(results, type="bca")
 ```
 
+logged:
 ```{r}
 # Bootstrap 95% CI for R-Squared
 library(boot)
@@ -111,8 +116,33 @@ boot.ci(results, type="bca")
 
 How does the former compare to the SE estimated from your entire dataset using the formula for standard error implemented in lm()?
 
+Not logged:                   
+                              standard error
+                       whole dataset     Boot
+(Intercept)             4.651e-01       0.1659757
+Body_mass_female_mean   4.736e-05       0.1107041
+
+Logged:
+                              standard error
+                       whole dataset     Boot
+(Intercept)             0.67293       0.5248282
+Body_mass_female_mean   0.08488       0.04714853
+
 How does the latter compare to the 95% CI estimated from your entire dataset?
 
+Whole dataset:
+Not Logged:
+
+Bootstrapped results:
+Not Logged:
+Intervals : 
+Level       BCa          
+95%   ( 0.0512,  0.4449 ) 
+
+Logged:
+Intervals : 
+Level       BCa          
+95%   ( 0.4213,  0.6097 )
 EXTRA CREDIT
 
 Write a FUNCTION that takes as its arguments a dataframe, “d”, a linear model, “m” (as a character string, e.g., “logHR~logBM”), a user-defined confidence interval level, “conf.level” (with default = 0.95), and a number of bootstrap replicates, “n” (with default = 1000). Your function should return a dataframe that includes: beta coefficient names; beta coefficients, standard errors, and upper and lower CI limits for the linear model based on your entire dataset; and mean beta coefficient estimates, SEs, and CI limits for those coefficients based on your bootstrap.
