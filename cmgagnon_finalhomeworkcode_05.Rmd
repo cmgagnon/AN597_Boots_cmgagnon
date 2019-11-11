@@ -1,0 +1,152 @@
+---
+title: "AN597_Boots_cmgagnon"
+author: "Christian Gagnon"
+date: "11/11/2019"
+output: html_document
+---
+
+#Bootstrapping Standard Errors and CIs for Linear Models.
+
+When we initially discussed the central limit theorem and confidence intervals, we showed how we could use bootstrapping to estimate standard errors and confidence intervals around certain parameter values, like the mean. Using bootstrapping, we could also do the same for estimating standard errors and CIs around regression parameters, such as β coefficients.
+
+##[1] Using the “KamilarAndCooperData.csv” dataset, run a linear regression looking at log(HomeRange_km2) in relation to log(Body_mass_female_mean) and report your β coeffiecients (slope and intercept).
+
+```{r}
+library(curl)
+library(dplyr)
+library(car)
+library(ggplot2)
+f <- curl("https://raw.githubusercontent.com/fuzzyatelin/fuzzyatelin.github.io/master/AN597_Fall19/KamilarAndCooperData.csv")
+d <- read.csv(f, header = TRUE, sep = ",", stringsAsFactors = TRUE)
+head(d)
+```
+
+```{r}
+g <- ggplot(data = d, aes(x = HomeRange_km2, y = Body_mass_female_mean))
+g <- g + geom_point()
+g <- g + geom_smooth(method = "lm", formula = y ~ x)
+g
+```
+This visualization is ok but I think I will try logging both variables.
+
+I found a different method, lets give this a try:
+```{r}
+library(ggpmisc)
+m <- lm(data = d, HomeRange_km2 ~ Body_mass_female_mean)
+summary(m)
+qqPlot(m$residuals)
+ggplot(data = m, aes(x = HomeRange_km2, y = Body_mass_female_mean)) + ggtitle("HomeRange_km2 ~ Body_mass_female_mean") + geom_point() + geom_smooth(method = "lm", 
+    formula = y ~ x) + stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+    parse=TRUE,label.x.npc = "left")
+```
+Coefficients:
+                       Estimate Std. Error
+(Intercept)           5.041e-01  4.651e-01
+Body_mass_female_mean 2.454e-04  4.736e-05
+                      t value Pr(>|t|)    
+(Intercept)             1.084     0.28    
+Body_mass_female_mean   5.183 7.78e-07 ***
+
+Now with log:
+```{r}
+mlog <- lm(data = d, log(HomeRange_km2) ~ log(Body_mass_female_mean))
+summary(mlog)
+qqPlot(mlog$residuals)
+ggplot(data = m, aes(x = log(HomeRange_km2), y = log(Body_mass_female_mean))) + ggtitle("log(HomeRange_km2) ~ log(Body_mass_female_mean)") + geom_point() + geom_smooth(method = "lm", 
+    formula = y ~ x) + stat_poly_eq(formula = y ~ x, aes(label = paste(..eq.label.., ..rr.label.., sep = "~~~")), 
+    parse=TRUE,label.x.npc = "left")
+```
+
+Coefficients:
+                           Estimate Std. Error
+(Intercept)                -9.44123    0.67293
+log(Body_mass_female_mean)  1.03643    0.08488
+                           t value Pr(>|t|)    
+(Intercept)                 -14.03   <2e-16 ***
+log(Body_mass_female_mean)   12.21   <2e-16 ***
+
+
+##[2] Then, use bootstrapping to sample from your data 1000 times with replacement, each time fitting the same model and calculating the same coefficients. This generates a sampling distribution for each β coefficient.
+
+##Estimate the standard error for each of your β coefficients as the standard deviation of the sampling distribution from your bootstrap and determine the 95% CI for each of your β coefficients based on the appropriate quantiles from your sampling distribution.
+
+Not logged:
+```{r}
+# Bootstrap 95% CI for R-Squared
+library(boot)
+# function to obtain R-Squared from the data
+rsq <- function(formula, data, indices) {
+  p <- data[indices,] # allows boot to select sample
+  fit <- lm(formula, data=p)
+  return(summary(fit)$r.square)
+}
+# bootstrapping with 1000 replications
+results <- boot(data=d, statistic=rsq,
+   R=1000, formula=HomeRange_km2 ~ Body_mass_female_mean)
+
+# view results
+results
+plot(results)
+
+# get 95% confidence interval
+boot.ci(results, type="bca")
+```
+
+logged:
+```{r}
+# Bootstrap 95% CI for R-Squared
+library(boot)
+# function to obtain R-Squared from the data
+rsq <- function(formula, data, indices) {
+  p <- data[indices,] # allows boot to select sample
+  fit <- lm(formula, data=p)
+  return(summary(fit)$r.square)
+}
+# bootstrapping with 1000 replications
+results <- boot(data=d, statistic=rsq,
+   R=1000, formula=log(HomeRange_km2) ~ log(Body_mass_female_mean))
+
+# view results
+results
+plot(results)
+
+# get 95% confidence interval
+boot.ci(results, type="bca")
+```
+
+How does the former compare to the SE estimated from your entire dataset using the formula for standard error implemented in lm()?
+
+Not logged:                   
+                              standard error
+                       whole dataset     Boot
+(Intercept)             4.651e-01       0.1659757
+Body_mass_female_mean   4.736e-05       0.1107041
+
+Logged:
+                              standard error
+                       whole dataset     Boot
+(Intercept)             0.67293       0.5248282
+Body_mass_female_mean   0.08488       0.04714853
+
+How does the latter compare to the 95% CI estimated from your entire dataset?
+
+Whole dataset:
+Not Logged:
+
+Bootstrapped results:
+Not Logged:
+Intervals : 
+Level       BCa          
+95%   ( 0.0512,  0.4449 ) 
+
+Logged:
+Intervals : 
+Level       BCa          
+95%   ( 0.4213,  0.6097 )
+EXTRA CREDIT
+
+Write a FUNCTION that takes as its arguments a dataframe, “d”, a linear model, “m” (as a character string, e.g., “logHR~logBM”), a user-defined confidence interval level, “conf.level” (with default = 0.95), and a number of bootstrap replicates, “n” (with default = 1000). Your function should return a dataframe that includes: beta coefficient names; beta coefficients, standard errors, and upper and lower CI limits for the linear model based on your entire dataset; and mean beta coefficient estimates, SEs, and CI limits for those coefficients based on your bootstrap.
+
+EXTRA EXTRA CREDIT
+
+Graph each beta value from the linear model and its corresponding mean value, lower CI and upper CI from a bootstrap as a function of number of bootstraps from 10 to 200 by 10s. HINT: the beta value from the linear model will be the same for all bootstraps and the mean beta value may not differ that much!
